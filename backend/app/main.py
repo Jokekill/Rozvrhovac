@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import activities, registers
+from app.api import activities, registers, schedules, settings as settings_api, solver, views
 from app.config import get_settings
 
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +32,10 @@ app.add_middleware(
 
 app.include_router(registers.router, prefix="/api")
 app.include_router(activities.router, prefix="/api")
+app.include_router(schedules.router, prefix="/api")
+app.include_router(views.router, prefix="/api")
+app.include_router(solver.router, prefix="/api")
+app.include_router(settings_api.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["system"])

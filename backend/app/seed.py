@@ -112,7 +112,7 @@ def seed_demo(db: Session, *, seed: int = 42) -> dict[str, int]:
         ("Učebna A2", "A2", "A", "1", 32, []),
         ("Učebna A3", "A3", "A", "2", 28, ["projector"]),
         ("Učebna B1", "B1", "B", "1", 24, ["projector"]),
-        ("Učebna B2", "B2", "B", "1", 24, []),
+        ("Laboratoř chemie B2", "B2", "B", "1", 24, ["chemistry_lab", "projector"]),
         ("Klavírní studio K1", "K1", "B", "2", 4, ["piano", "soundproof"]),
         ("Koncertní sál K2", "K2", "B", "2", 60, ["grand_piano", "stage", "piano"]),
         ("Divadelní sál D1", "D1", "C", "1", 40, ["stage", "soundproof"]),
