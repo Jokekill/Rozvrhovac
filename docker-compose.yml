@@ -1,0 +1,67 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: timetable
+      POSTGRES_PASSWORD: timetable
+      POSTGRES_DB: timetable
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U timetable"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    ports:
+      - "6379:6379"
+
+  api:
+    build: ./backend
+    entrypoint: ["/app/entrypoint.sh"]
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://timetable:timetable@db:5432/timetable
+      REDIS_URL: redis://redis:6379/0
+      SEED_DEMO: "true"
+      CORS_ORIGINS: "http://localhost:5173,http://localhost:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  worker:
+    build: ./backend
+    command: ["python", "-m", "app.worker"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://timetable:timetable@db:5432/timetable
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_BASE: http://localhost:8000/api
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+
+volumes:
+  pgdata:

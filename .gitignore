@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.sqlite3
+*.db
+node_modules/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+coverage/
+.DS_Store
+*.egg-info/
+exports/
