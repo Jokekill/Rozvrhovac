@@ -57,6 +57,40 @@ from app.services.serializers import group_out, room_out, student_out
 router = APIRouter()
 
 
+def _sync_class_membership(
+    db: Session, student: Student, previous_group_id: int | None
+) -> None:
+    """Keep the class group's membership in step with ``class_group_id``.
+
+    A class is an ordinary :class:`StudentGroup`, and activities are attached to
+    groups, so a student whose class is set must also be a member of it -
+    otherwise their class lessons would be scheduled without them.
+    """
+    if previous_group_id == student.class_group_id:
+        return
+    if previous_group_id is not None:
+        db.execute(
+            delete(StudentGroupMember).where(
+                StudentGroupMember.group_id == previous_group_id,
+                StudentGroupMember.student_id == student.id,
+            )
+        )
+    if student.class_group_id is not None:
+        exists = db.execute(
+            select(StudentGroupMember).where(
+                StudentGroupMember.group_id == student.class_group_id,
+                StudentGroupMember.student_id == student.id,
+            )
+        ).scalars().first()
+        if exists is None:
+            db.add(
+                StudentGroupMember(
+                    group_id=student.class_group_id, student_id=student.id
+                )
+            )
+    db.flush()
+
+
 def _get_or_404(db: Session, model, obj_id: int):
     obj = db.get(model, obj_id)
     if obj is None:
@@ -96,6 +130,7 @@ def create_student(
     student = Student(**payload.model_dump())
     db.add(student)
     db.flush()
+    _sync_class_membership(db, student, None)
     audit.record(
         db, entity_type="Student", entity_id=student.id, action="CREATE",
         actor=user.actor, new_value=payload.model_dump(),
@@ -123,8 +158,11 @@ def update_student(
     student = _get_or_404(db, Student, student_id)
     changes = payload.model_dump(exclude_unset=True)
     old = {k: getattr(student, k) for k in changes}
+    previous_group_id = student.class_group_id
     for key, value in changes.items():
         setattr(student, key, value)
+    db.flush()
+    _sync_class_membership(db, student, previous_group_id)
     audit.record(
         db, entity_type="Student", entity_id=student.id, action="UPDATE",
         actor=user.actor, old_value=old, new_value=changes,

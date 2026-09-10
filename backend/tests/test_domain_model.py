@@ -160,3 +160,40 @@ def test_seed_demo_dataset(db):
     assert db.query(Room).count() == 10
     individual = db.query(Activity).filter(Activity.kind == "INDIVIDUAL").count()
     assert individual == 15
+
+
+def test_setting_a_class_makes_the_student_a_member_of_it(client):
+    """A class is an ordinary group, so class lessons must include the student."""
+    kvinta = client.post(
+        "/api/groups", json={"name": "Kvinta", "code": "KV", "type": "CLASS"}
+    ).json()
+    kvarta = client.post(
+        "/api/groups", json={"name": "Kvarta", "code": "KA", "type": "CLASS"}
+    ).json()
+
+    student = client.post(
+        "/api/students",
+        json={"first_name": "Anna", "last_name": "Nováková", "class_group_id": kvinta["id"]},
+    ).json()
+    assert client.get(f"/api/groups/{kvinta['id']}").json()["student_ids"] == [student["id"]]
+
+    # Moving to another class moves the membership with it.
+    client.put(f"/api/students/{student['id']}", json={"class_group_id": kvarta["id"]})
+    assert client.get(f"/api/groups/{kvinta['id']}").json()["student_ids"] == []
+    assert client.get(f"/api/groups/{kvarta['id']}").json()["student_ids"] == [student["id"]]
+
+    # Clearing the class removes it again.
+    client.put(f"/api/students/{student['id']}", json={"class_group_id": None})
+    assert client.get(f"/api/groups/{kvarta['id']}").json()["student_ids"] == []
+
+
+def test_class_membership_survives_an_unrelated_update(client):
+    kvinta = client.post(
+        "/api/groups", json={"name": "Kvinta", "code": "KV", "type": "CLASS"}
+    ).json()
+    student = client.post(
+        "/api/students",
+        json={"first_name": "Petr", "last_name": "Malý", "class_group_id": kvinta["id"]},
+    ).json()
+    client.put(f"/api/students/{student['id']}", json={"last_name": "Velký"})
+    assert client.get(f"/api/groups/{kvinta['id']}").json()["member_count"] == 1

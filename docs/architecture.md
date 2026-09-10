@@ -191,6 +191,14 @@ erDiagram
     }
 ```
 
+### Třída jako skupina
+
+`Student.class_group_id` je pohodlný odkaz na kmenovou třídu, ale plánování
+pracuje výhradně s tabulkou `student_group_member`. API proto obě věci drží
+v souladu: nastavení nebo změna třídy studenta automaticky založí, přesune
+nebo zruší jeho členství v odpovídající skupině. Bez toho by aktivity
+navázané na třídu byly naplánovány „bez studentů“.
+
 ### Poznámka k pojmenování
 
 Specifikace uvádí `ActivityAllowedRoom` / `ActivityPreferredRoom` /
