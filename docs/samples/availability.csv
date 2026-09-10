@@ -1,0 +1,4 @@
+owner_type,owner_external_id,kind,day,start,end,note
+TEACHER,T001,UNAVAILABLE,Po,8:00,12:00,Externí spolupráce
+TEACHER,T002,PREFERRED,St,13:00,18:00,
+ROOM,K1,UNAVAILABLE,Pá,13:00,20:00,Pronájem

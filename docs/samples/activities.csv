@@ -1,0 +1,2 @@
+name,subject_code,kind,duration_minutes,occurrences_per_cycle,teacher_external_ids,group_codes,student_external_ids,required_features,align_to_periods,active
+Drama A,DRA,CROSS_CLASS,90,1,T002,DRAMA-A,,stage,1,1

@@ -1,0 +1,3 @@
+student_external_id,subject_code,teacher_external_id,duration_minutes,occurrences_per_cycle,allowed_days,required_features,active
+S0001,KLV,T001,45,1,Po;Út,piano,1
+S0002,HOU,T002,30,2,Út;Čt,,1
