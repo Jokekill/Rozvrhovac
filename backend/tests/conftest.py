@@ -10,8 +10,12 @@ import pytest
 os.environ.setdefault("RUN_SOLVER_INLINE", "true")
 os.environ.setdefault("AUTH_MODE", "disabled")
 
+# Tests run on a throwaway SQLite file by default. Set TEST_DATABASE_URL to
+# run the same suite against PostgreSQL, which is what production uses.
 _TMP_DIR = tempfile.mkdtemp(prefix="timetable-tests-")
-os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DIR}/test.db"
+os.environ["DATABASE_URL"] = os.environ.get(
+    "TEST_DATABASE_URL", f"sqlite:///{_TMP_DIR}/test.db"
+)
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402

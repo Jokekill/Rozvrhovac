@@ -74,6 +74,17 @@ def preview_import(
     return _import(db, entity, file, commit=False)
 
 
+@router.post("/imports/{entity}", response_model=ImportResultOut, tags=["imports"])
+def import_entity(
+    entity: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(db_session),
+    user: CurrentUser = Depends(require_scheduler),
+) -> ImportResultOut:
+    """Shorthand for ``/imports/{entity}/commit`` (see §24 of the specification)."""
+    return commit_import(entity, file, db, user)
+
+
 @router.post("/imports/{entity}/commit", response_model=ImportResultOut, tags=["imports"])
 def commit_import(
     entity: str,

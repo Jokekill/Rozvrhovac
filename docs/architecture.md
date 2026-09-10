@@ -346,7 +346,7 @@ model se řeší po vrstvách (jen studenti → + učitelé → + místnosti →
 | --- | --- |
 | Číselníky | `/students`, `/teachers`, `/rooms`, `/room-features`, `/subjects`, `/groups`, `/activities`, `/availability` |
 | Kalendář | `/cycle`, `/cycle/days`, `/cycle/periods` |
-| Import | `/imports/{entity}/preview`, `/imports/{entity}/commit` |
+| Import | `/imports/{entity}/preview`, `/imports/{entity}/commit` (zkratka `/imports/{entity}`) |
 | Export | `/exports/schedule/{version_id}?format=csv|xlsx|pdf|ics&view=…` |
 | Solver | `/solver/runs`, `/solver/runs/{id}`, `/solver/runs/{id}/cancel`, `/solver/validate` |
 | Rozvrhy | `/schedules`, `/schedules/{id}/versions`, `/versions/{id}` (+ duplicate/compare/publish) |
@@ -389,4 +389,4 @@ neexistují a nesmí být doplněny.
 | 5 | Ruční editace, lock, reoptimalizace | ✅ |
 | 6 | Import/export CSV, XLSX, PDF, ICS | ✅ |
 | 7 | Pokročilé constraints (parallel, spreading, gaps, lunch, buildings) | ✅ |
-| 8 | Autentizace OIDC / Entra ID | ⏳ připraveno rozhraní |
+| 8 | Autentizace OIDC / Entra ID | ⏳ připraveno rozhraní (`AUTH_MODE`, `require_role`) |

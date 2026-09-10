@@ -311,4 +311,16 @@ export interface VersionCompare {
   }[]
 }
 
+export type LinkKind = 'SAME_START' | 'NOT_SIMULTANEOUS' | 'BEFORE'
+
+export interface ActivityLink {
+  id: number
+  kind: LinkKind
+  activity_a_id: number
+  activity_b_id: number
+  note: string | null
+  activity_a_name: string | null
+  activity_b_name: string | null
+}
+
 export type ViewScope = 'school' | 'student' | 'class' | 'group' | 'teacher' | 'room'

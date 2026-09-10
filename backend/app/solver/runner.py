@@ -221,6 +221,10 @@ def execute_run(run_id: int, session: Session | None = None) -> SolverRun:
                 run.status = SolverStatus.CANCELLED
                 db.commit()
                 return run
+            if cancelled:
+                # Stopped early on request, but a valid schedule was already
+                # found, so it is kept rather than thrown away.
+                run.log = f"{result.log} (zrušeno uživatelem, nejlepší řešení uloženo)"
 
             if result.status in ("OPTIMAL", "FEASIBLE"):
                 version = persist_version(

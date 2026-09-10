@@ -1,9 +1,15 @@
 import { useState } from 'react'
 import { api } from '../api'
 import { Badge, CheckList, ConfirmButton, Loading, Message, Modal } from '../components/ui'
-import { duration } from '../format'
+import { absoluteMinute, duration, hhmm, minuteOfDay, parseHhmm } from '../format'
 import { useAsync } from '../hooks'
-import type { Activity, ActivityKind } from '../types'
+import type { Activity, ActivityKind, LinkKind } from '../types'
+
+const LINK_KINDS: [LinkKind, string][] = [
+  ['SAME_START', 'Musí začínat současně (paralelní výuka)'],
+  ['NOT_SIMULTANEOUS', 'Nesmí probíhat současně'],
+  ['BEFORE', 'A musí předcházet B'],
+]
 
 const KINDS: [ActivityKind, string][] = [
   ['STANDARD', 'Běžná hodina'],
@@ -22,6 +28,8 @@ const EMPTY = {
   occurrences_per_cycle: 1,
   align_to_periods: true,
   min_capacity: null as number | null,
+  fixed_start_minute: null as number | null,
+  fixed_room_id: null as number | null,
   teacher_ids: [] as number[],
   group_ids: [] as number[],
   student_ids: [] as number[],
@@ -38,6 +46,8 @@ export function ActivitiesPage() {
   const students = useAsync(() => api.students.list(), [])
   const rooms = useAsync(() => api.rooms.list(), [])
   const features = useAsync(() => api.roomFeatures.list(), [])
+  const days = useAsync(() => api.cycle.days(), [])
+  const activityLinks = useAsync(() => api.activityLinks.list(), [])
 
   const [form, setForm] = useState<typeof EMPTY | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -59,6 +69,8 @@ export function ActivitiesPage() {
       occurrences_per_cycle: activity.occurrences_per_cycle,
       align_to_periods: activity.align_to_periods,
       min_capacity: activity.min_capacity,
+      fixed_start_minute: activity.fixed_start_minute,
+      fixed_room_id: activity.fixed_room_id,
       teacher_ids: activity.teacher_ids,
       group_ids: activity.group_ids,
       student_ids: activity.student_ids,
@@ -170,6 +182,19 @@ export function ActivitiesPage() {
         )}
       </div>
 
+      <div className="panel">
+        <h2>Vazby mezi aktivitami</h2>
+        <p className="muted">
+          SAME_START sváže půlené skupiny, NOT_SIMULTANEOUS rozdělí aktivity i bez společného
+          studenta, BEFORE vynutí pořadí.
+        </p>
+        <LinkEditor
+          activities={activities.data ?? []}
+          links={activityLinks.data ?? []}
+          onChanged={() => activityLinks.reload()}
+        />
+      </div>
+
       {form ? (
         <Modal
           title={editingId === null ? 'Nová aktivita' : 'Úprava aktivity'}
@@ -267,6 +292,81 @@ export function ActivitiesPage() {
             </label>
           </div>
 
+          <div className="row">
+            <div style={{ flex: 1 }}>
+              <label>Pevný den (HC09)</label>
+              <select
+                value={
+                  form.fixed_start_minute === null
+                    ? ''
+                    : Math.floor(form.fixed_start_minute / 1440)
+                }
+                onChange={(event) => {
+                  if (!event.target.value) {
+                    setForm({ ...form, fixed_start_minute: null })
+                    return
+                  }
+                  const minute =
+                    form.fixed_start_minute === null
+                      ? 8 * 60
+                      : minuteOfDay(form.fixed_start_minute)
+                  setForm({
+                    ...form,
+                    fixed_start_minute: absoluteMinute(Number(event.target.value), minute),
+                  })
+                }}
+              >
+                <option value="">— není pevná —</option>
+                {(days.data ?? []).map((day) => (
+                  <option key={day.ordinal} value={day.ordinal}>
+                    {day.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div style={{ width: 120 }}>
+              <label>Pevný začátek</label>
+              <input
+                type="text"
+                placeholder="15:00"
+                disabled={form.fixed_start_minute === null}
+                defaultValue={
+                  form.fixed_start_minute === null ? '' : hhmm(form.fixed_start_minute)
+                }
+                onBlur={(event) => {
+                  const minute = parseHhmm(event.target.value)
+                  if (minute === null || form.fixed_start_minute === null) return
+                  setForm({
+                    ...form,
+                    fixed_start_minute: absoluteMinute(
+                      Math.floor(form.fixed_start_minute / 1440),
+                      minute,
+                    ),
+                  })
+                }}
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label>Pevná učebna</label>
+              <select
+                value={form.fixed_room_id ?? ''}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    fixed_room_id: event.target.value ? Number(event.target.value) : null,
+                  })
+                }
+              >
+                <option value="">—</option>
+                {(rooms.data ?? []).map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="row" style={{ alignItems: 'flex-start' }}>
             <div style={{ flex: 1 }}>
               <label>Učitelé</label>
@@ -335,6 +435,110 @@ export function ActivitiesPage() {
           </div>
         </Modal>
       ) : null}
+    </>
+  )
+}
+
+
+function LinkEditor({
+  activities,
+  links,
+  onChanged,
+}: {
+  activities: Activity[]
+  links: import('../types').ActivityLink[]
+  onChanged: () => void
+}) {
+  const [kind, setKind] = useState<LinkKind>('SAME_START')
+  const [left, setLeft] = useState<number | null>(null)
+  const [right, setRight] = useState<number | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const add = async () => {
+    if (left === null || right === null) return
+    setError(null)
+    try {
+      await api.activityLinks.create({ kind, activity_a_id: left, activity_b_id: right })
+      onChanged()
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : String(problem))
+    }
+  }
+
+  return (
+    <>
+      {error ? <Message kind="error">{error}</Message> : null}
+      <div className="row">
+        <div style={{ flex: 1 }}>
+          <label>Druh vazby</label>
+          <select value={kind} onChange={(event) => setKind(event.target.value as LinkKind)}>
+            {LINK_KINDS.map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label>Aktivita A</label>
+          <select
+            value={left ?? ''}
+            onChange={(event) => setLeft(event.target.value ? Number(event.target.value) : null)}
+          >
+            <option value="">—</option>
+            {activities.map((activity) => (
+              <option key={activity.id} value={activity.id}>
+                {activity.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ flex: 1 }}>
+          <label>Aktivita B</label>
+          <select
+            value={right ?? ''}
+            onChange={(event) => setRight(event.target.value ? Number(event.target.value) : null)}
+          >
+            <option value="">—</option>
+            {activities.map((activity) => (
+              <option key={activity.id} value={activity.id}>
+                {activity.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button onClick={add} disabled={left === null || right === null || left === right}>
+          Přidat vazbu
+        </button>
+      </div>
+      <table>
+        <tbody>
+          {links.map((link) => (
+            <tr key={link.id}>
+              <td>
+                <Badge>{LINK_KINDS.find(([k]) => k === link.kind)?.[1] ?? link.kind}</Badge>
+              </td>
+              <td>{link.activity_a_name}</td>
+              <td>{link.activity_b_name}</td>
+              <td style={{ textAlign: 'right' }}>
+                <ConfirmButton
+                  onConfirm={async () => {
+                    await api.activityLinks.remove(link.id)
+                    onChanged()
+                  }}
+                >
+                  Smazat
+                </ConfirmButton>
+              </td>
+            </tr>
+          ))}
+          {links.length === 0 ? (
+            <tr>
+              <td className="muted">Zatím žádné vazby.</td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
     </>
   )
 }

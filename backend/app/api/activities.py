@@ -213,11 +213,26 @@ def delete_activity(
 # --------------------------------------------------------------------------
 # Links (HC12 / HC13 / HC14)
 # --------------------------------------------------------------------------
+def _link_out(db: Session, link: ActivityLink) -> ActivityLinkOut:
+    left = db.get(Activity, link.activity_a_id)
+    right = db.get(Activity, link.activity_b_id)
+    return ActivityLinkOut(
+        id=link.id,
+        kind=link.kind,
+        activity_a_id=link.activity_a_id,
+        activity_b_id=link.activity_b_id,
+        note=link.note,
+        activity_a_name=left.name if left else None,
+        activity_b_name=right.name if right else None,
+    )
+
+
 @router.get("/activity-links", response_model=list[ActivityLinkOut], tags=["activities"])
 def list_links(
     db: Session = Depends(db_session), _: CurrentUser = Depends(require_viewer)
-) -> list[ActivityLink]:
-    return db.execute(select(ActivityLink).order_by(ActivityLink.id)).scalars().all()
+) -> list[ActivityLinkOut]:
+    rows = db.execute(select(ActivityLink).order_by(ActivityLink.id)).scalars().all()
+    return [_link_out(db, link) for link in rows]
 
 
 @router.post("/activity-links", response_model=ActivityLinkOut, status_code=201, tags=["activities"])
@@ -225,13 +240,13 @@ def create_link(
     payload: ActivityLinkIn,
     db: Session = Depends(db_session),
     _: CurrentUser = Depends(require_scheduler),
-) -> ActivityLink:
+) -> ActivityLinkOut:
     if payload.activity_a_id == payload.activity_b_id:
         raise HTTPException(400, "An activity cannot be linked to itself")
     link = ActivityLink(**payload.model_dump())
     db.add(link)
     db.commit()
-    return link
+    return _link_out(db, link)
 
 
 @router.delete("/activity-links/{link_id}", status_code=204, tags=["activities"])

@@ -1,5 +1,6 @@
 import type {
   Activity,
+  ActivityLink,
   AvailabilityWindow,
   ConstraintWeight,
   CycleConfig,
@@ -125,6 +126,16 @@ export const api = {
     update: (id: number, body: Record<string, unknown>) =>
       put<Activity>(`/activities/${id}`, body),
     remove: (id: number) => del(`/activities/${id}`),
+  },
+  activityLinks: {
+    list: () => get<ActivityLink[]>('/activity-links'),
+    create: (body: {
+      kind: string
+      activity_a_id: number
+      activity_b_id: number
+      note?: string | null
+    }) => post<ActivityLink>('/activity-links', body),
+    remove: (id: number) => del(`/activity-links/${id}`),
   },
   individualLessons: {
     list: () => get<IndividualLesson[]>('/individual-lessons'),

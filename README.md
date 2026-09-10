@@ -81,6 +81,13 @@ cd backend
 pytest -q
 ```
 
+Testy běží proti dočasné SQLite databázi. Stejnou sadu lze pustit proti
+PostgreSQL, což je produkční databáze:
+
+```bash
+TEST_DATABASE_URL="postgresql+psycopg://timetable:timetable@localhost:5432/timetable_test" pytest -q
+```
+
 Sada obsahuje povinné testy solveru podle zadání: konflikt studenta,
 konflikt učitele, konflikt učebny, smíšené skupiny, vlastnosti učebny,
 dostupnost učitele, pevná hodina, uzamčená hodina, paralelní hodiny

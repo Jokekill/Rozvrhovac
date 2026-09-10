@@ -93,6 +93,8 @@ class ActivityLinkIn(BaseModel):
 
 class ActivityLinkOut(ORMModel, ActivityLinkIn):
     id: int
+    activity_a_name: str | None = None
+    activity_b_name: str | None = None
 
 
 class IndividualLessonRow(BaseModel):
