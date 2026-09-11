@@ -90,3 +90,7 @@ WEIGHT_VERY_LOW = 1
 WEIGHT_LOW = 10
 WEIGHT_MEDIUM = 100
 WEIGHT_HIGH = 1000
+# Above the scale in the specification: rules that describe the *shape* of the
+# school day have to outrank ordinary comfort rules such as gaps, or the solver
+# trades a hole in the compulsory morning block for a shorter afternoon.
+WEIGHT_CRITICAL = 10000

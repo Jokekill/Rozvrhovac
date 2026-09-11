@@ -39,6 +39,14 @@ class CycleConfig(Base):
     individual_preferred_start: Mapped[int] = mapped_column(Integer, default=13 * 60)
     individual_preferred_end: Mapped[int] = mapped_column(Integer, default=19 * 60)
 
+    # Shape of the school day. Everything before ``core_day_start_minute`` is
+    # the zeroth hour: legal, but discouraged (SC18). The first
+    # ``core_block_periods`` periods at or after it form the compulsory block
+    # every student should attend every day (SC17).
+    core_day_start_minute: Mapped[int] = mapped_column(Integer, default=8 * 60)
+    core_block_periods: Mapped[int] = mapped_column(Integer, default=4)
+    min_student_lessons_per_day: Mapped[int] = mapped_column(Integer, default=4)
+
 
 class Day(Base):
     """One day of the planning cycle.

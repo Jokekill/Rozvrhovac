@@ -12,6 +12,7 @@ from app.models import (
     ActivityStudentGroup,
     ActivityTeacher,
     AvailabilityWindow,
+    CycleConfig,
     Day,
     Period,
     Room,
@@ -31,10 +32,26 @@ from app.solver.runner import execute_run
 SLOT = 45
 
 
-def set_calendar(db: Session, *, days: int = 1, slots: int = 2, start: int = 8 * 60) -> None:
-    """Replace the cycle with ``days`` days of exactly ``slots`` lesson slots."""
+def set_calendar(
+    db: Session,
+    *,
+    days: int = 1,
+    slots: int = 2,
+    start: int = 8 * 60,
+    zeroth: bool = False,
+    core_periods: int = 0,
+    min_lessons: int = 0,
+) -> None:
+    """Replace the cycle with ``days`` days of exactly ``slots`` lesson slots.
+
+    The day-shape rules are off by default: a two slot day cannot honour "four
+    lessons a day" and the resulting constant penalty would only muddy the
+    scenarios that exist to test something else. Tests that want SC16/SC17 ask
+    for them explicitly.
+    """
     db.execute(delete(Day))
     db.execute(delete(Period))
+    day_start = start - SLOT if zeroth else start
     for ordinal in range(days):
         db.add(
             Day(
@@ -42,19 +59,27 @@ def set_calendar(db: Session, *, days: int = 1, slots: int = 2, start: int = 8 *
                 week_index=0,
                 weekday=ordinal % 7,
                 name=f"D{ordinal}",
-                start_minute=start,
+                start_minute=day_start,
                 end_minute=start + slots * SLOT,
             )
         )
-    for index in range(slots):
+    index = 0
+    if zeroth:
+        db.add(Period(index=0, name="0.", start_minute=day_start, end_minute=start))
+        index = 1
+    for slot in range(slots):
         db.add(
             Period(
-                index=index,
-                name=f"{index + 1}.",
-                start_minute=start + index * SLOT,
-                end_minute=start + (index + 1) * SLOT,
+                index=index + slot,
+                name=f"{slot + 1}.",
+                start_minute=start + slot * SLOT,
+                end_minute=start + (slot + 1) * SLOT,
             )
         )
+    config = db.get(CycleConfig, 1)
+    config.core_day_start_minute = start
+    config.core_block_periods = core_periods
+    config.min_student_lessons_per_day = min_lessons
     db.flush()
 
 

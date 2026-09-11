@@ -9,6 +9,7 @@ const SCALE = [
   [10, 'LOW'],
   [100, 'MEDIUM'],
   [1000, 'HIGH'],
+  [10000, 'CRITICAL'],
 ] as const
 
 export function SettingsPage() {
@@ -158,6 +159,46 @@ export function SettingsPage() {
                 }}
               />
             </div>
+            <div style={{ width: 170 }}>
+              <label>Řádný den začíná</label>
+              <input
+                type="text"
+                defaultValue={hhmm(cycle.data.core_day_start_minute)}
+                onBlur={async (event) => {
+                  const value = parseHhmm(event.target.value)
+                  if (value !== null) {
+                    await api.cycle.update({ core_day_start_minute: value })
+                    cycle.reload()
+                  }
+                }}
+              />
+            </div>
+            <div style={{ width: 170 }}>
+              <label>Hodin v jádru dne</label>
+              <input
+                type="number"
+                min={0}
+                defaultValue={cycle.data.core_block_periods}
+                onBlur={async (event) => {
+                  await api.cycle.update({ core_block_periods: Number(event.target.value) })
+                  cycle.reload()
+                }}
+              />
+            </div>
+            <div style={{ width: 190 }}>
+              <label>Min. hodin studentovi/den</label>
+              <input
+                type="number"
+                min={0}
+                defaultValue={cycle.data.min_student_lessons_per_day}
+                onBlur={async (event) => {
+                  await api.cycle.update({
+                    min_student_lessons_per_day: Number(event.target.value),
+                  })
+                  cycle.reload()
+                }}
+              />
+            </div>
             <div style={{ width: 200 }}>
               <label>Max. minut studentovi/den</label>
               <input
@@ -200,12 +241,25 @@ export function SettingsPage() {
 
         <h3>Mřížka hodin</h3>
         <div className="chips">
-          {(periods.data ?? []).map((period) => (
-            <Badge key={period.id}>
-              {period.name} {hhmm(period.start_minute)}–{hhmm(period.end_minute)}
-            </Badge>
-          ))}
+          {(periods.data ?? []).map((period, position) => {
+            const boundary = cycle.data?.core_day_start_minute ?? 0
+            const zeroth = period.start_minute < boundary
+            const core =
+              !zeroth &&
+              position <
+                (periods.data ?? []).filter((p) => p.start_minute < boundary).length +
+                  (cycle.data?.core_block_periods ?? 0)
+            return (
+              <Badge key={period.id} tone={zeroth ? 'warn' : core ? 'ok' : undefined}>
+                {period.name} {hhmm(period.start_minute)}–{hhmm(period.end_minute)}
+              </Badge>
+            )
+          })}
         </div>
+        <p className="muted">
+          Zeleně jádro dne – hodiny, ve kterých má být ve škole každý student (SC17).
+          Oranžově nultá hodina, kterou solver používá jen výjimečně (SC18).
+        </p>
       </div>
 
       <div className="panel">

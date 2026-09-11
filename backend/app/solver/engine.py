@@ -47,6 +47,9 @@ PENALTY_GROUPS = {
     "SC13": "early_late_lessons",
     "SC14": "building_transitions",
     "SC15": "schedule_changes",
+    "SC16": "student_min_lessons",
+    "SC17": "core_block",
+    "SC18": "zeroth_hour",
 }
 
 
@@ -85,6 +88,7 @@ class TimetableModel:
         self._penalty_terms: dict[str, list[tuple[int, cp_model.IntVar]]] = {}
         self._in_day_cache: dict[tuple[int, int, int], cp_model.IntVar] = {}
         self._domain_cache: dict[tuple[int, int, tuple], cp_model.IntVar] = {}
+        self._student_groups: list[tuple[object, list[Occurrence], int]] | None = None
         self.build_diagnostics: list[dict] = []
         self._has_hints = False
 
@@ -313,13 +317,43 @@ class TimetableModel:
                     self.model.Add(a.end <= b.start)
 
     # -- soft constraints ------------------------------------------------
+    def _student_signature_groups(self):
+        """(student, occurrences, multiplier) for students with identical days.
+
+        Students that attend exactly the same set of occurrences produce
+        identical per-day expressions, so they collapse into one group whose
+        penalty is multiplied by the group size. In a real school most of a
+        class shares the same signature, which keeps the model small. Cached,
+        because SC02/SC09, SC16 and SC17 all want the same grouping.
+        """
+        if self._student_groups is not None:
+            return self._student_groups
+        by_signature: dict[tuple, list[int]] = {}
+        for student_id in self.data.students:
+            signature = tuple(
+                sorted(
+                    o.key
+                    for o in self.occurrences
+                    if student_id in o.activity.student_ids
+                )
+            )
+            if signature:
+                by_signature.setdefault(signature, []).append(student_id)
+        index = {o.key: o for o in self.occurrences}
+        self._student_groups = [
+            (
+                self.data.students[student_ids[0]],
+                [index[key] for key in signature],
+                len(student_ids),
+            )
+            for signature, student_ids in by_signature.items()
+        ]
+        return self._student_groups
+
     def _resource_day_groups(self):
         """(role, person, occurrences, multiplier) tuples for day based rules.
 
-        Students that attend exactly the same set of occurrences produce
-        identical gap and load expressions, so they are collapsed into a single
-        group whose penalty is multiplied by the group size. In a real school
-        most of a class shares the same signature, which keeps the model small.
+        Student groups come from :meth:`_student_signature_groups`.
         """
         groups: list[tuple[str, object, list[Occurrence], int]] = []
         if self._enabled("SC01") or self._enabled("SC10"):
@@ -330,23 +364,8 @@ class TimetableModel:
                 if occurrences:
                     groups.append(("teacher", person, occurrences, 1))
         if self._enabled("SC02") or self._enabled("SC09"):
-            by_signature: dict[tuple, list[int]] = {}
-            for student_id in self.data.students:
-                signature = tuple(
-                    sorted(
-                        o.key
-                        for o in self.occurrences
-                        if student_id in o.activity.student_ids
-                    )
-                )
-                if signature:
-                    by_signature.setdefault(signature, []).append(student_id)
-            index = {o.key: o for o in self.occurrences}
-            for signature, student_ids in by_signature.items():
-                person = self.data.students[student_ids[0]]
-                groups.append(
-                    ("student", person, [index[key] for key in signature], len(student_ids))
-                )
+            for person, occurrences, multiplier in self._student_signature_groups():
+                groups.append(("student", person, occurrences, multiplier))
         return groups
 
     def _day_span_penalties(self) -> None:
@@ -653,6 +672,137 @@ class TimetableModel:
             literal = self._reify_start_in(occurrence, bad, "early_late")
             self._add_penalty("SC13", literal)
 
+    def _min_lessons_penalties(self) -> None:
+        """SC16 - a day a student comes in for is worth at least N lessons.
+
+        A day with no teaching at all is free: the rule forbids the pointless
+        trip to school for a single lesson, not the day off. ``attends`` is
+        pushed up by every lesson placed on the day, so the solver can only
+        escape the shortfall by emptying the day completely.
+        """
+        if not self._enabled("SC16"):
+            return
+        minimum = self.data.config.min_student_lessons_per_day
+        if minimum <= 1:
+            return
+        for person, occurrences, multiplier in self._student_signature_groups():
+            for day in self.data.days:
+                relevant = [
+                    o
+                    for o in occurrences
+                    if any(
+                        s // MINUTES_PER_DAY == day.ordinal
+                        for s in o.activity.candidate_starts
+                    )
+                ]
+                if not relevant:
+                    continue
+                presence = [self._in_day(o, day.ordinal) for o in relevant]
+                attends = self.model.NewBoolVar(
+                    f"attends_s{person.id}_d{day.ordinal}"
+                )
+                for literal in presence:
+                    self.model.Add(attends >= literal)
+                shortfall = self.model.NewIntVar(
+                    0, minimum, f"short_s{person.id}_d{day.ordinal}"
+                )
+                self.model.Add(shortfall >= minimum * attends - sum(presence))
+                self._add_penalty("SC16", shortfall, multiplier)
+
+    def _core_signature_groups(self, core):
+        """Like :meth:`_student_signature_groups`, but only core-capable lessons.
+
+        Core coverage depends solely on the occurrences that can land in a core
+        slot at all. Afternoon-only tuition is what makes a student's full
+        signature unique, so ignoring it collapses a whole class back into one
+        group and takes SC17 from thousands of variables down to dozens.
+        """
+        windows = [
+            (day.offset + period.start_minute, day.offset + period.end_minute)
+            for day in self.data.days
+            for period in core
+        ]
+
+        def reaches_core(occurrence: Occurrence) -> bool:
+            return any(
+                start < window_end and start + occurrence.duration > window_start
+                for start in occurrence.activity.candidate_starts
+                for window_start, window_end in windows
+            )
+
+        core_capable = {o.key for o in self.occurrences if reaches_core(o)}
+        merged: dict[tuple, tuple[object, int]] = {}
+        for person, occurrences, multiplier in self._student_signature_groups():
+            signature = tuple(sorted(o.key for o in occurrences if o.key in core_capable))
+            representative, headcount = merged.get(signature, (person, 0))
+            merged[signature] = (representative, headcount + multiplier)
+        index = {o.key: o for o in self.occurrences}
+        return [
+            (representative, [index[key] for key in signature], headcount)
+            for signature, (representative, headcount) in merged.items()
+        ]
+
+    def _core_block_penalties(self) -> None:
+        """SC17 - everybody is in school for the first periods, every day.
+
+        "Covers the period" is overlap, not an equal start, so a double lesson
+        or an activity that ignores the period grid still counts.
+        """
+        if not self._enabled("SC17"):
+            return
+        core = self.data.core_periods()
+        if not core:
+            return
+        for person, occurrences, multiplier in self._core_signature_groups(core):
+            for day in self.data.days:
+                for period in core:
+                    slot_start = day.offset + period.start_minute
+                    slot_end = day.offset + period.end_minute
+                    if slot_start < day.abs_start or slot_end > day.abs_end:
+                        continue
+                    covering = []
+                    for occurrence in occurrences:
+                        values = {
+                            s
+                            for s in occurrence.activity.candidate_starts
+                            if s < slot_end and s + occurrence.duration > slot_start
+                        }
+                        if not values:
+                            continue
+                        covering.append(
+                            self._reify_start_in(
+                                occurrence, values, f"core_p{period.index}"
+                            )
+                        )
+                    missing = self.model.NewBoolVar(
+                        f"core_miss_s{person.id}_d{day.ordinal}_p{period.index}"
+                    )
+                    if covering:
+                        self.model.Add(sum(covering) + missing >= 1)
+                    else:
+                        self.model.Add(missing == 1)
+                    self._add_penalty("SC17", missing, multiplier)
+
+    def _zeroth_hour_penalties(self) -> None:
+        """SC18 - the zeroth hour is legal, but stays the exception.
+
+        Everything starting before ``core_day_start_minute`` counts, so the
+        rule follows the configured boundary rather than a period index.
+        """
+        if not self._enabled("SC18"):
+            return
+        boundary = self.data.config.core_day_start_minute
+        for occurrence in self.occurrences:
+            early = {
+                s
+                for s in occurrence.activity.candidate_starts
+                if (s % MINUTES_PER_DAY) < boundary
+            }
+            if not early:
+                continue
+            literal = self._reify_start_in(occurrence, early, "zeroth")
+            self._add_penalty("SC18", literal)
+
     def _change_penalties(self) -> None:
         """SC15 – MINIMIZE_CHANGES_FROM_CURRENT_SCHEDULE."""
         if not self._enabled("SC15") or not self.data.base_assignments:
@@ -701,6 +851,9 @@ class TimetableModel:
         self._lunch_penalties()
         self._individual_block_penalties()
         self._early_late_penalties()
+        self._min_lessons_penalties()
+        self._core_block_penalties()
+        self._zeroth_hour_penalties()
         self._change_penalties()
         self._hints()
 

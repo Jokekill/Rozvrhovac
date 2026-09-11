@@ -68,6 +68,8 @@ synchronně ve stejném procesu (bez Redis).
 * Absolutní čas: `cycle_minute = ordinal * 1440 + minuty_od_půlnoci`.
   Díky posunu o celý den nemůže žádný interval „přetéct“ do dalšího dne.
 * `Day.start_minute` / `Day.end_minute` ohraničují vyučovací den (HC10).
+  Vyučovací den musí začínat nejpozději nultou hodinou, jinak je pro solver
+  nedosažitelná.
 * `CycleConfig.granularity_minutes` (default 5) je základní krok začátků.
 * `Period` je nepovinná klasická mřížka (08:00–08:45, …). Aktivita s
   `align_to_periods = true` smí začínat pouze na začátku periody, ostatní
@@ -292,7 +294,10 @@ Váhy jsou uloženy v tabulce `constraint_weight` a administrátor je mění
 přes API/GUI, **bez zásahu do zdrojového kódu**. Váha `0` pravidlo vypne
 (odpovídající proměnné se vůbec nevytvoří).
 
-Škála: `VERY_LOW = 1`, `LOW = 10`, `MEDIUM = 100`, `HIGH = 1000`.
+Škála: `VERY_LOW = 1`, `LOW = 10`, `MEDIUM = 100`, `HIGH = 1000`,
+`CRITICAL = 10000`. Stupeň `CRITICAL` je vyhrazený pravidlům, která určují
+tvar vyučovacího dne (SC16, SC17) – musí přebít běžná komfortní pravidla,
+jinak solver vymění díru v jádru dne za kratší odpoledne.
 
 | Kód | Popis | Penalizovaná veličina |
 | --- | --- | --- |
@@ -311,6 +316,34 @@ přes API/GUI, **bez zásahu do zdrojového kódu**. Váha `0` pravidlo vypne
 | SC13 | Velmi brzy / velmi pozdě | výskyt před `early_threshold` nebo končící po `late_threshold` |
 | SC14 | Přesuny mezi budovami | počet různých budov osoby za den − 1 |
 | SC15 | `MINIMIZE_CHANGES_FROM_CURRENT_SCHEDULE` | změna času / místnosti proti výchozí verzi |
+| SC16 | Minimální počet hodin za den | chybějící hodiny pod `min_student_lessons_per_day` v den, kdy student do školy jde |
+| SC17 | Jádro dne – první hodiny povinně | každá z prvních `core_block_periods` hodin, ve které student nemá výuku |
+| SC18 | Nultá hodina jen výjimečně | výskyt začínající před `core_day_start_minute` |
+
+### Tvar vyučovacího dne (SC16–SC18)
+
+Mřížka začíná **nultou hodinou v 7:10–7:55**, po ní pětiminutová přestávka a
+v 8:00 obvyklá 1. hodina. `core_day_start_minute` (8:00) je hranice mezi
+nultou hodinou a řádnou mřížkou; všechno před ní platí SC18, takže solver
+nultou hodinu použije, až když jinde místo není.
+
+`core_block_periods` (výchozí 4) říká, kolik prvních řádných hodin tvoří
+**jádro dne** – blok, ve kterém má být ve škole každý student, každý
+vyučovací den. SC17 penalizuje každý nepokrytý slot vahou `CRITICAL`, a to jednou
+za každého studenta ve skupině, takže díra v jádru dne je nejdražší běžná
+chyba v rozvrhu. „Pokrývá hodinu“ znamená překryv, ne shodný začátek – dvouhodinovka
+i aktivita mimo mřížku se počítají.
+
+SC16 hlídá `min_student_lessons_per_day` (výchozí 4) zvlášť: den, do kterého
+student vůbec přijde, mu má dát aspoň tolik hodin. Den zcela bez výuky se
+nepenalizuje, takže úniková cesta je den vyprázdnit, ne ho zaplnit jednou
+hodinou. Při zapnutém SC17 je SC16 z větší části redundantní – smysl dostává,
+když se jádro dne zmenší nebo vypne.
+
+Obě pravidla jsou **soft**. Když dataset na zaplnění jádra nestačí, rozvrh
+přesto vznikne a předběžná diagnostika to pojmenuje kódem
+`CORE_BLOCK_UNDERSUPPLIED` včetně toho, kolika studentům a o kolik hodin
+chybí.
 
 Objektivní funkce:
 

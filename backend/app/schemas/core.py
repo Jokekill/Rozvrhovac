@@ -178,7 +178,7 @@ class DayIn(BaseModel):
     week_index: int = 0
     weekday: int
     name: str
-    start_minute: int = 8 * 60
+    start_minute: int = 7 * 60 + 10
     end_minute: int = 17 * 60
     active: bool = True
 
@@ -211,6 +211,9 @@ class CycleConfigOut(ORMModel):
     max_student_minutes_per_day: int
     individual_preferred_start: int
     individual_preferred_end: int
+    core_day_start_minute: int
+    core_block_periods: int
+    min_student_lessons_per_day: int
 
 
 class CycleConfigUpdate(BaseModel):
@@ -225,3 +228,6 @@ class CycleConfigUpdate(BaseModel):
     max_student_minutes_per_day: int | None = None
     individual_preferred_start: int | None = None
     individual_preferred_end: int | None = None
+    core_day_start_minute: int | None = None
+    core_block_periods: int | None = None
+    min_student_lessons_per_day: int | None = None

@@ -111,6 +111,19 @@ class SolverConfig:
     max_student_minutes_per_day: int = 360
     individual_preferred_start: int = 13 * 60
     individual_preferred_end: int = 19 * 60
+    core_day_start_minute: int = 8 * 60
+    core_block_periods: int = 4
+    min_student_lessons_per_day: int = 4
+
+
+@dataclass(slots=True)
+class PeriodData:
+    """One slot of the classic lesson grid, in minutes from midnight."""
+
+    index: int
+    name: str
+    start_minute: int
+    end_minute: int
 
 
 @dataclass(slots=True)
@@ -121,6 +134,7 @@ class SolverInput:
     rooms: dict[int, RoomData]
     teachers: dict[int, PersonData]
     students: dict[int, PersonData]
+    periods: list[PeriodData] = field(default_factory=list)
     links: list[LinkData] = field(default_factory=list)
     config: SolverConfig = field(default_factory=SolverConfig)
     weights: dict[str, int] = field(default_factory=dict)
@@ -133,6 +147,18 @@ class SolverInput:
 
     def weight(self, code: str) -> int:
         return int(self.weights.get(code, 0))
+
+    def core_periods(self) -> list[PeriodData]:
+        """The first ``core_block_periods`` slots of the regular grid.
+
+        Anything starting before ``core_day_start_minute`` is the zeroth hour
+        and is deliberately *not* part of the compulsory block.
+        """
+        regular = sorted(
+            (p for p in self.periods if p.start_minute >= self.config.core_day_start_minute),
+            key=lambda p: p.start_minute,
+        )
+        return regular[: max(0, self.config.core_block_periods)]
 
     def activity_by_id(self, activity_id: int) -> ActivityData | None:
         for activity in self.activities:

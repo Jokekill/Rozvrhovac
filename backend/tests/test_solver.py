@@ -443,3 +443,90 @@ def test_parallel_activities_sharing_a_teacher_are_explained(db):
     assert "PARALLEL_SHARED_TEACHER" in codes
     message = " ".join(i["message"] for i in run.diagnostics)
     assert "K Procházka" in message
+
+
+def test_core_block_fills_the_first_periods(db):
+    """SC17 – a student with four lessons spends the whole core block in school.
+
+    The day has five slots and the student has exactly four lessons, so the
+    solver is free to scatter them. The core block is what makes it pack them
+    into slots 1-4 instead.
+    """
+    set_calendar(db, days=1, slots=5, core_periods=4)
+    make_room(db, "A1")
+    make_room(db, "A2")
+    teacher = make_teacher(db, "J Novák")
+    student = make_student(db, "Anna Nováková")
+    for name in ("Matematika", "Čeština", "Angličtina", "Dějepis"):
+        make_activity(db, name, teachers=[teacher], students=[student])
+
+    run = solve(db)
+    assert run.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    starts = sorted(item.start_minute for item in items_of(db, run))
+    assert starts == [abs_minute(0, 8 * 60 + slot * SLOT) for slot in range(4)]
+    assert "core_block" not in run.penalties
+
+
+def test_core_block_reports_what_it_cannot_fill(db):
+    """SC17 is soft: too few lessons costs penalty, it does not kill the run."""
+    set_calendar(db, days=1, slots=4, core_periods=4)
+    make_room(db, "A1")
+    make_activity(
+        db, "Matematika",
+        teachers=[make_teacher(db, "J Novák")],
+        students=[make_student(db, "Anna Nováková")],
+    )
+
+    run = solve(db)
+    assert run.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    # One lesson covers one of the four core slots, the other three are missing.
+    assert run.penalties.get("core_block", 0) > 0
+
+
+def test_minimum_lessons_per_day_empties_the_thin_day(db):
+    """SC16 – two lessons a day beats one lesson on each of two days."""
+    set_calendar(db, days=2, slots=4, min_lessons=2)
+    make_room(db, "A1")
+    teacher = make_teacher(db, "J Novák")
+    student = make_student(db, "Anna Nováková")
+    make_activity(db, "Matematika", teachers=[teacher], students=[student])
+    make_activity(db, "Čeština", teachers=[teacher], students=[student])
+
+    run = solve(db)
+    assert run.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    days = {item.start_minute // 1440 for item in items_of(db, run)}
+    assert len(days) == 1
+    assert "student_min_lessons" not in run.penalties
+
+
+def test_zeroth_hour_is_the_last_resort(db):
+    """SC18 – the 07:15 slot exists but stays empty while a later one is free."""
+    set_calendar(db, days=1, slots=2, zeroth=True)
+    make_room(db, "A1")
+    make_activity(
+        db, "Matematika",
+        teachers=[make_teacher(db, "J Novák")],
+        students=[make_student(db, "Anna Nováková")],
+    )
+
+    run = solve(db)
+    assert run.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    item = items_of(db, run)[0]
+    assert item.start_minute >= abs_minute(0, 8 * 60)
+    assert "zeroth_hour" not in run.penalties
+
+
+def test_zeroth_hour_is_still_usable_when_needed(db):
+    """SC18 is a preference, not a ban: a full day pushes a lesson into it."""
+    set_calendar(db, days=1, slots=2, zeroth=True)
+    make_room(db, "A1")
+    teacher = make_teacher(db, "J Novák")
+    student = make_student(db, "Anna Nováková")
+    for name in ("Matematika", "Čeština", "Angličtina"):
+        make_activity(db, name, teachers=[teacher], students=[student])
+
+    run = solve(db)
+    assert run.status in (SolverStatus.OPTIMAL, SolverStatus.FEASIBLE)
+    starts = sorted(item.start_minute for item in items_of(db, run))
+    assert starts[0] == abs_minute(0, 8 * 60 - SLOT)
+    assert run.penalties.get("zeroth_hour", 0) > 0

@@ -37,6 +37,7 @@ from app.solver.model import (
     Assignment,
     DayData,
     LinkData,
+    PeriodData,
     PersonData,
     RoomData,
     SolverConfig,
@@ -188,6 +189,11 @@ def load_solver_input(
             config_row.individual_preferred_start if config_row else 13 * 60
         ),
         individual_preferred_end=config_row.individual_preferred_end if config_row else 19 * 60,
+        core_day_start_minute=config_row.core_day_start_minute if config_row else 8 * 60,
+        core_block_periods=config_row.core_block_periods if config_row else 4,
+        min_student_lessons_per_day=(
+            config_row.min_student_lessons_per_day if config_row else 4
+        ),
     )
 
     days = [
@@ -203,9 +209,16 @@ def load_solver_input(
         .scalars()
         .all()
     ]
-    period_starts = sorted(
-        p.start_minute for p in db.execute(select(Period).order_by(Period.index)).scalars()
-    )
+    periods = [
+        PeriodData(
+            index=p.index,
+            name=p.name,
+            start_minute=p.start_minute,
+            end_minute=p.end_minute,
+        )
+        for p in db.execute(select(Period).order_by(Period.index)).scalars()
+    ]
+    period_starts = sorted(p.start_minute for p in periods)
 
     windows_by_owner: dict[tuple[str, int], list[AvailabilityWindow]] = defaultdict(list)
     for window in db.execute(select(AvailabilityWindow)).scalars():
@@ -360,6 +373,7 @@ def load_solver_input(
     return SolverInput(
         days=days,
         period_starts=period_starts,
+        periods=periods,
         activities=activities,
         rooms=rooms,
         teachers=teachers,

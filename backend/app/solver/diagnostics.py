@@ -273,6 +273,51 @@ def validate_dataset(input_data: SolverInput) -> list[dict]:
                 {"required_minutes": needed, "available_minutes": available},
             )
 
+    # Can the compulsory morning block (SC17) be filled at all?
+    core = input_data.core_periods()
+    if core and input_data.weight("SC17") > 0:
+        slots_needed = len(core) * len(input_data.days)
+        core_windows = [
+            (day.offset + period.start_minute, day.offset + period.end_minute)
+            for day in input_data.days
+            for period in core
+        ]
+        core_supply: dict[int, int] = defaultdict(int)
+        for activity in input_data.activities:
+            if activity.occurrences <= 0:
+                continue
+            fits_core = any(
+                start < window_end and start + activity.duration > window_start
+                for start in activity.candidate_starts
+                for window_start, window_end in core_windows
+            )
+            if not fits_core:
+                continue
+            for student_id in activity.student_ids:
+                core_supply[student_id] += activity.occurrences
+        short = [
+            (input_data.students[student_id].name, core_supply.get(student_id, 0))
+            for student_id in input_data.students
+            if core_supply.get(student_id, 0) < slots_needed
+        ]
+        if short:
+            worst = sorted(short, key=lambda item: item[1])[:3]
+            listed = ", ".join(f"{name} ({count})" for name, count in worst)
+            add(
+                "CORE_BLOCK_UNDERSUPPLIED",
+                "WARNING",
+                (
+                    f"{len(short)} studentů nemá dost hodin na zaplnění prvních "
+                    f"{len(core)} hodin každý den: potřeba {slots_needed} hodin za cyklus, "
+                    f"nejméně jich má {listed}. Rozvrh vznikne, ale jádro dne "
+                    "(SC17) zůstane místy děravé."
+                ),
+                details={
+                    "slots_needed": slots_needed,
+                    "students_short": len(short),
+                },
+            )
+
     # Room feature demand versus supply.
     supply: dict[int, int] = defaultdict(int)
     for room in input_data.rooms.values():

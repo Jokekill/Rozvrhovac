@@ -161,6 +161,9 @@ export interface CycleConfig {
   max_student_minutes_per_day: number
   individual_preferred_start: number
   individual_preferred_end: number
+  core_day_start_minute: number
+  core_block_periods: number
+  min_student_lessons_per_day: number
 }
 
 export interface AvailabilityWindow {

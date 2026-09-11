@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.models import ConstraintWeight, CycleConfig, Day, Period
 from app.models.enums import (
+    WEIGHT_CRITICAL,
     WEIGHT_HIGH,
     WEIGHT_LOW,
     WEIGHT_MEDIUM,
@@ -14,7 +15,10 @@ from app.models.enums import (
 
 CZECH_DAY_NAMES = ["Pondělí", "Úterý", "Středa", "Čtvrtek", "Pátek", "Sobota", "Neděle"]
 
+# The zeroth hour is a real slot in the grid, just one the solver is told to
+# use sparingly (SC18). It ends five minutes before the first hour starts.
 DEFAULT_PERIODS = [
+    ("0. hodina", 7 * 60 + 10, 7 * 60 + 55),
     ("1. hodina", 8 * 60, 8 * 60 + 45),
     ("2. hodina", 8 * 60 + 55, 9 * 60 + 40),
     ("3. hodina", 9 * 60 + 50, 10 * 60 + 35),
@@ -57,6 +61,15 @@ CONSTRAINT_CATALOGUE: list[tuple[str, str, int, str]] = [
      "Penalizuje každou další budovu, do které se osoba musí během dne přesunout."),
     ("SC15", "Minimalizovat změny proti výchozímu rozvrhu", WEIGHT_MEDIUM,
      "Při reoptimalizaci penalizuje každou změnu času nebo učebny proti výchozí verzi."),
+    ("SC16", "Minimální počet hodin za den", WEIGHT_CRITICAL,
+     "Penalizuje každou chybějící hodinu pod min_student_lessons_per_day v den, "
+     "kdy student do školy vůbec jde. Den bez výuky se nepenalizuje."),
+    ("SC17", "Jádro dne – první hodiny povinně", WEIGHT_CRITICAL,
+     "Penalizuje každou z prvních core_block_periods hodin, ve které student nemá "
+     "výuku. Platí pro každý vyučovací den a vynucuje společný dopolední blok."),
+    ("SC18", "Nultá hodina jen výjimečně", WEIGHT_MEDIUM,
+     "Penalizuje každý výskyt, který začíná před core_day_start_minute, aby se "
+     "nultá hodina používala méně než zbytek mřížky."),
 ]
 
 
@@ -80,7 +93,7 @@ def ensure_cycle(db: Session, days: int = 5, weeks: int = 1) -> CycleConfig:
                         week_index=week,
                         weekday=weekday,
                         name=CZECH_DAY_NAMES[weekday % 7] + suffix,
-                        start_minute=8 * 60,
+                        start_minute=DEFAULT_PERIODS[0][1],
                         end_minute=19 * 60,
                     )
                 )

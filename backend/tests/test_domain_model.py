@@ -15,8 +15,18 @@ def test_bootstrap_creates_cycle_and_weights(client):
     assert [d["ordinal"] for d in days] == [0, 1, 2, 3, 4]
     assert days[0]["name"] == "Pondělí"
     periods = client.get("/api/cycle/periods").json()
-    assert len(periods) == 8
-    assert periods[0]["start_minute"] == 8 * 60
+    assert len(periods) == 9  # the zeroth hour plus eight regular ones
+    assert periods[0]["name"] == "0. hodina"
+    assert periods[0]["start_minute"] == 7 * 60 + 10
+    assert periods[1]["start_minute"] == 8 * 60
+
+    # The zeroth hour must sit inside the teaching day, or it is unreachable.
+    assert days[0]["start_minute"] <= periods[0]["start_minute"]
+
+    config = client.get("/api/cycle").json()
+    assert config["core_day_start_minute"] == periods[1]["start_minute"]
+    assert config["core_block_periods"] == 4
+    assert config["min_student_lessons_per_day"] == 4
 
 
 def test_student_crud(client):

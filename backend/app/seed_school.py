@@ -10,10 +10,10 @@ Shape (all of it configurable through :class:`SchoolSpec`):
 * 20 rooms, of which 12 are specialised,
 * teachers sized from the actual teaching load, not guessed.
 
-The academic grid runs 08:00-15:20 (eight periods) while art tuition may be
-placed between 13:00 and 20:00, so the two deliberately overlap: an afternoon
-solo lesson really can collide with a class lesson, which is exactly the
-tension the solver has to resolve.
+The academic grid runs 08:00-15:20 (eight periods) with an optional zeroth
+hour at 07:10, while art tuition may be placed between 13:00 and 20:00, so the
+two deliberately overlap: an afternoon solo lesson really can collide with a
+class lesson, which is exactly the tension the solver has to resolve.
 """
 from __future__ import annotations
 
@@ -63,9 +63,12 @@ from app.services.bootstrap import bootstrap
 # --------------------------------------------------------------------------
 LESSON = 45
 ART_WINDOW = (13 * 60, 20 * 60)
-DAY_WINDOW = (8 * 60, 20 * 60)
+# The zeroth hour widens the teaching day; the core grid still starts at 08:00.
+CORE_DAY_START = 8 * 60
+DAY_WINDOW = (7 * 60 + 10, 20 * 60)
 
 PERIODS = [
+    ("0. hodina", 7 * 60 + 10, 7 * 60 + 55),
     ("1. hodina", 8 * 60, 8 * 60 + 45),
     ("2. hodina", 8 * 60 + 55, 9 * 60 + 40),
     ("3. hodina", 9 * 60 + 50, 10 * 60 + 35),
@@ -225,6 +228,11 @@ def seed_school(db: Session, spec: SchoolSpec | None = None) -> dict[str, int]:
     config.individual_preferred_start = ART_WINDOW[0]
     config.individual_preferred_end = ART_WINDOW[1]
     config.max_student_minutes_per_day = 8 * LESSON
+    config.core_day_start_minute = CORE_DAY_START
+    config.core_block_periods = 4
+    config.min_student_lessons_per_day = 4
+    # SC18 already owns the zeroth hour, so SC13 must not charge for it twice.
+    config.early_threshold_minute = DAY_WINDOW[0]
     db.flush()
 
     # ---- features, rooms -------------------------------------------------
