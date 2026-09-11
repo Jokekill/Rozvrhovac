@@ -52,6 +52,32 @@ Kontejner `api` při startu spustí migrace a (při `SEED_DEMO=true`) naplní
 DEMO dataset: 3 třídy, 60 studentů, 12 učitelů, 10 učeben, 15 individuálních
 hudebních lekcí, 2 dramatické skupiny napříč třídami, sbor a půlenou informatiku.
 
+## Testovací data
+
+K dispozici jsou dva datasety:
+
+```bash
+python manage.py seed-demo      # malý, 60 studentů, pro rychlé vyzkoušení
+python manage.py seed-school    # celá škola, 325 studentů
+```
+
+`seed-school` vygeneruje osmileté gymnázium (Prima až Oktáva, 25 až 30
+studentů ve třídě) a lyceum (4 třídy po 25). Dále 38 učitelů, 20 učeben
+z toho 12 specializovaných, půlenou informatiku v každé třídě svázanou
+vazbou `SAME_START`, pět souborů napříč ročníky (sbor, komorní orchestr,
+dva dramatické soubory, jazzový band) a 87 individuálních lekcí na sedm
+nástrojů. Dohromady 241 aktivit a 433 hodin k naplánování.
+
+Akademická mřížka běží 08:00 až 15:20, umělecká výuka smí 13:00 až 20:00.
+Ta překryvná dvě hodiny jsou záměrné: odpolední sólová lekce se opravdu
+může srazit s hodinou třídy a solver to musí vyřešit.
+
+Velikost lze měnit:
+
+```bash
+python manage.py seed-school --seed 12 --solo-share 0.4
+```
+
 ## Vývoj bez Dockeru
 
 ```bash
