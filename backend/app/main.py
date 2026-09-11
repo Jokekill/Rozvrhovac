@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import (
     activities,
     data_io,
+    datasets,
     registers,
     schedules,
     settings as settings_api,
@@ -45,6 +46,7 @@ app.include_router(views.router, prefix="/api")
 app.include_router(solver.router, prefix="/api")
 app.include_router(settings_api.router, prefix="/api")
 app.include_router(data_io.router, prefix="/api")
+app.include_router(datasets.router, prefix="/api")
 
 
 @app.get("/api/health", tags=["system"])

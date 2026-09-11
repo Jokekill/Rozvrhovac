@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     oidc_audience: str | None = None
 
     default_solver_time_limit: int = 60
+    # Generating a test dataset wipes the database, so production deployments
+    # can switch the endpoint off entirely.
+    allow_dataset_generation: bool = True
     solver_workers: int = 8
 
     cors_origins: str = "http://localhost:5173,http://localhost:3000"

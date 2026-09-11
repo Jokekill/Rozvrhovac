@@ -325,6 +325,43 @@ def validate_dataset(input_data: SolverInput) -> list[dict]:
                 left.id,
                 {"other_activity_id": right.id},
             )
+        shared_teachers = set(left.teacher_ids) & set(right.teacher_ids)
+        if shared_teachers:
+            names = ", ".join(
+                input_data.teachers[teacher_id].name
+                for teacher_id in sorted(shared_teachers)
+                if teacher_id in input_data.teachers
+            )
+            add(
+                "PARALLEL_SHARED_TEACHER",
+                "ERROR",
+                (
+                    f"Aktivity '{left.name}' a '{right.name}' mají začínat současně, ale "
+                    f"obě má učit {names}. Jedna z půlených skupin potřebuje jiného učitele."
+                ),
+                "Activity",
+                left.id,
+                {"other_activity_id": right.id, "teacher_ids": sorted(shared_teachers)},
+            )
+        shared_rooms = (
+            set(left.compatible_room_ids) & set(right.compatible_room_ids)
+            if len(set(left.compatible_room_ids) | set(right.compatible_room_ids)) == 1
+            else set()
+        )
+        if shared_rooms:
+            room = input_data.rooms.get(next(iter(shared_rooms)))
+            add(
+                "PARALLEL_SINGLE_ROOM",
+                "ERROR",
+                (
+                    f"Aktivity '{left.name}' a '{right.name}' mají běžet současně, ale obě "
+                    f"se vejdou jen do jediné učebny "
+                    f"({room.name if room else next(iter(shared_rooms))})."
+                ),
+                "Activity",
+                left.id,
+                {"other_activity_id": right.id},
+            )
 
     return issues
 

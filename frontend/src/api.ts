@@ -1,6 +1,9 @@
 import type {
   Activity,
   ActivityLink,
+  DatasetInfo,
+  DatasetRequest,
+  DatasetResult,
   AvailabilityWindow,
   ConstraintWeight,
   CycleConfig,
@@ -220,6 +223,10 @@ export const api = {
         body: form,
       })
     },
+  },
+  datasets: {
+    info: () => get<DatasetInfo>('/datasets'),
+    generate: (body: DatasetRequest) => post<DatasetResult>('/datasets/generate', body),
   },
   exportUrl: (
     versionId: number,

@@ -369,6 +369,9 @@ def seed_school(db: Session, spec: SchoolSpec | None = None) -> dict[str, int]:
 
     for code, total in sorted(lesson_load.items()):
         needed = max(1, -(-total // spec.lessons_per_teacher))
+        if code == "INF":
+            # Both halves of a split lesson run at the same moment.
+            needed = max(2, needed)
         for _ in range(needed):
             make_teacher([code])
 
@@ -386,9 +389,17 @@ def seed_school(db: Session, spec: SchoolSpec | None = None) -> dict[str, int]:
 
     teacher_minutes: dict[int, int] = {}
 
-    def pick_teacher(code: str, minutes: int) -> Teacher:
-        """Least loaded qualified teacher, so nobody is over-booked by accident."""
-        candidates = teachers_by_subject[code]
+    def pick_teacher(code: str, minutes: int, *, exclude: set[int] | None = None) -> Teacher:
+        """Least loaded qualified teacher, so nobody is over-booked by accident.
+
+        ``exclude`` keeps the two halves of a split lesson apart: they are tied
+        with SAME_START, so one teacher could never cover both.
+        """
+        candidates = [
+            t for t in teachers_by_subject[code] if not exclude or t.id not in exclude
+        ]
+        if not candidates:
+            candidates = teachers_by_subject[code]
         chosen = min(candidates, key=lambda t: teacher_minutes.get(t.id, 0))
         teacher_minutes[chosen.id] = teacher_minutes.get(chosen.id, 0) + minutes
         return chosen
@@ -489,14 +500,16 @@ def seed_school(db: Session, spec: SchoolSpec | None = None) -> dict[str, int]:
         half = len(members) // 2
         first_half = make_group_helper(db, f"{class_name} – informatika 1", f"{group.code}-INF1", members[:half])
         second_half = make_group_helper(db, f"{class_name} – informatika 2", f"{group.code}-INF2", members[half:])
+        first_teacher = pick_teacher("INF", LESSON)
+        second_teacher = pick_teacher("INF", LESSON, exclude={first_teacher.id})
         left = add_activity(
             f"Informatika {class_name} – skupina 1", "INF",
-            [pick_teacher("INF", LESSON)], groups=[first_half],
+            [first_teacher], groups=[first_half],
             required_features=["computers"], kind=ActivityKind.SPLIT,
         )
         right = add_activity(
             f"Informatika {class_name} – skupina 2", "INF",
-            [pick_teacher("INF", LESSON)], groups=[second_half],
+            [second_teacher], groups=[second_half],
             required_features=["computers"], kind=ActivityKind.SPLIT,
         )
         db.add(
@@ -577,9 +590,23 @@ def seed_school(db: Session, spec: SchoolSpec | None = None) -> dict[str, int]:
 
     # ---- availability and preferences -----------------------------------
     all_teachers = db.execute(select(Teacher)).scalars().all()
+
+    # A teacher of a fixed lesson must stay available on that day, otherwise the
+    # dataset contradicts itself before the solver even starts.
+    fixed_days: dict[int, set[int]] = {}
+    for activity in db.execute(
+        select(Activity).where(Activity.fixed_start_minute.isnot(None))
+    ).scalars():
+        day_ordinal = activity.fixed_start_minute // MINUTES_PER_DAY
+        for link in activity.teachers:
+            fixed_days.setdefault(link.teacher_id, set()).add(day_ordinal)
+
     part_timers = rng.sample(all_teachers, max(4, len(all_teachers) // 6))
     for teacher in part_timers:
-        free_day = rng.randrange(5)
+        choices = [d for d in range(5) if d not in fixed_days.get(teacher.id, set())]
+        if not choices:
+            continue
+        free_day = rng.choice(choices)
         db.add(
             AvailabilityWindow(
                 owner_type=OwnerType.TEACHER, owner_id=teacher.id,

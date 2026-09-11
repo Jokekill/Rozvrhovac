@@ -423,3 +423,23 @@ def test_solver_stores_absolute_time_not_slot_index(db):
     assert item.duration_minutes == SLOT
     assert item.day_ordinal == item.start_minute // 1440
     assert item.room_id is not None
+
+
+def test_parallel_activities_sharing_a_teacher_are_explained(db):
+    """HC12 plus HC02 is unsatisfiable, and the diagnosis must say why."""
+    set_calendar(db, days=1, slots=2)
+    make_room(db, "P1", capacity=16, features=["computers"])
+    make_room(db, "P2", capacity=16, features=["computers"])
+    teacher = make_teacher(db, "K Procházka")
+    half_a = make_group(db, "INF 1", GroupType.SUBGROUP, students=[make_student(db, "S1")])
+    half_b = make_group(db, "INF 2", GroupType.SUBGROUP, students=[make_student(db, "S2")])
+    first = make_activity(db, "Informatika 1", teachers=[teacher], groups=[half_a])
+    second = make_activity(db, "Informatika 2", teachers=[teacher], groups=[half_b])
+    make_link(db, LinkKind.SAME_START, first, second)
+
+    run = solve(db, time_limit=10)
+    assert run.status == SolverStatus.INFEASIBLE
+    codes = {issue["code"] for issue in run.diagnostics}
+    assert "PARALLEL_SHARED_TEACHER" in codes
+    message = " ".join(i["message"] for i in run.diagnostics)
+    assert "K Procházka" in message

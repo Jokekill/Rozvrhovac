@@ -54,7 +54,19 @@ hudebních lekcí, 2 dramatické skupiny napříč třídami, sbor a půlenou in
 
 ## Testovací data
 
-K dispozici jsou dva datasety:
+Nejrychlejší cesta je stránka **Import**, kde je panel *Testovací data*.
+Nastavíte počet tříd, velikost tříd, počet běžných učeben a podíl studentů se
+sólovou výukou, a jedním tlačítkem se celá škola zapíše do databáze. Volitelně
+se rovnou spustí solver, takže po chvíli máte funkční rozvrh.
+
+Generování přepisuje celou databázi, proto vyžaduje roli `ADMIN`, explicitní
+potvrzení smazání současných dat a na produkci se dá vypnout:
+
+```bash
+ALLOW_DATASET_GENERATION=false
+```
+
+Totéž z příkazové řádky:
 
 ```bash
 python manage.py seed-demo      # malý, 60 studentů, pro rychlé vyzkoušení
@@ -77,6 +89,8 @@ Velikost lze měnit:
 ```bash
 python manage.py seed-school --seed 12 --solo-share 0.4
 ```
+
+Generátor je deterministický: stejný seed dá stejnou školu.
 
 ## Vývoj bez Dockeru
 

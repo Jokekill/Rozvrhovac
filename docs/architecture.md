@@ -354,7 +354,7 @@ model se řeší po vrstvách (jen studenti → + učitelé → + místnosti →
 | --- | --- |
 | Číselníky | `/students`, `/teachers`, `/rooms`, `/room-features`, `/subjects`, `/groups`, `/activities`, `/availability` |
 | Kalendář | `/cycle`, `/cycle/days`, `/cycle/periods` |
-| Import | `/imports/{entity}/preview`, `/imports/{entity}/commit` (zkratka `/imports/{entity}`) |
+| Import | `/imports/{entity}/preview`, `/imports/{entity}/commit` (zkratka `/imports/{entity}`), `/datasets/generate` |
 | Export | `/exports/schedule/{version_id}?format=csv|xlsx|pdf|ics&view=…` |
 | Solver | `/solver/runs`, `/solver/runs/{id}`, `/solver/runs/{id}/cancel`, `/solver/validate` |
 | Rozvrhy | `/schedules`, `/schedules/{id}/versions`, `/versions/{id}` (+ duplicate/compare/publish) |
@@ -402,6 +402,12 @@ period, umělecká 13:00–20:00 mimo mřížku. Odpolední sólová lekce se pr
 opravdu může srazit s hodinou třídy.
 
 Naměřené chování na tomto datasetu je popsané v README.
+
+Oba datasety jdou vygenerovat i z GUI přes `POST /datasets/generate`
+(stránka Import). Endpoint maže databázi, proto vyžaduje roli `ADMIN`,
+explicitní `reset` a dá se vypnout přes `ALLOW_DATASET_GENERATION=false`.
+Mazání je jediné místo v kódu, které maže všechna data, a je v
+`app/services/reset.py`.
 
 ## 13. Etapy
 

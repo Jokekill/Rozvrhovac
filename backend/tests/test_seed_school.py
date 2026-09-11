@@ -90,3 +90,42 @@ def test_generator_is_deterministic_and_refuses_to_run_twice(db):
     first = seed_school(db, SMALL)
     assert seed_school(db, SMALL) == {"skipped": 1}
     assert first["students"] > 0
+
+
+def test_split_lessons_get_two_different_teachers(db):
+    """Both halves run at the same moment, so one teacher cannot cover them."""
+    from app.models import ActivityLink
+    from app.models.enums import LinkKind
+
+    seed_school(db, SMALL)
+    links = db.query(ActivityLink).filter(ActivityLink.kind == LinkKind.SAME_START).all()
+    assert links, "split computer science is tied with SAME_START"
+    for link in links:
+        left = {t.teacher_id for t in db.get(Activity, link.activity_a_id).teachers}
+        right = {t.teacher_id for t in db.get(Activity, link.activity_b_id).teachers}
+        assert left and right
+        assert not (left & right), "parallel halves must not share a teacher"
+
+
+def test_fixed_lesson_never_lands_on_its_teachers_day_off(db):
+    """The generator must not contradict itself before the solver starts."""
+    from app.models import Activity, AvailabilityWindow
+    from app.models.calendar import MINUTES_PER_DAY
+    from app.models.enums import OwnerType
+
+    seed_school(db, SMALL)
+    fixed = db.query(Activity).filter(Activity.fixed_start_minute.isnot(None)).all()
+    assert fixed, "the dataset contains a fixed lesson"
+    for activity in fixed:
+        day = activity.fixed_start_minute // MINUTES_PER_DAY
+        for link in activity.teachers:
+            blocked = (
+                db.query(AvailabilityWindow)
+                .filter(
+                    AvailabilityWindow.owner_type == OwnerType.TEACHER,
+                    AvailabilityWindow.owner_id == link.teacher_id,
+                    AvailabilityWindow.day_ordinal == day,
+                )
+                .all()
+            )
+            assert blocked == []

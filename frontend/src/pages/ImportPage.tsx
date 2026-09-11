@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { api } from '../api'
+import { DatasetGenerator } from '../components/DatasetGenerator'
 import { Badge, Message } from '../components/ui'
 import { useAsync } from '../hooks'
 import type { ImportResult } from '../types'
@@ -60,12 +61,16 @@ export function ImportPage() {
     <>
       <h1>Import dat</h1>
       <p className="lead">
-        Nahrajte CSV nebo XLSX. Náhled nic nezapisuje; potvrzení je vše-nebo-nic, takže
-        chybný řádek zastaví celý soubor.
+        Buď si nechte vygenerovat kompletní testovací školu, nebo nahrajte vlastní CSV
+        či XLSX. Náhled importu nic nezapisuje; potvrzení je vše-nebo-nic, takže chybný
+        řádek zastaví celý soubor.
       </p>
       {error ? <Message kind="error">{error}</Message> : null}
 
+      <DatasetGenerator />
+
       <div className="panel">
+        <h2>Import ze souboru</h2>
         <div className="row">
           <div style={{ flex: 1 }}>
             <label>Co importujeme</label>

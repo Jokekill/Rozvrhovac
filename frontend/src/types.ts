@@ -311,6 +311,40 @@ export interface VersionCompare {
   }[]
 }
 
+export interface DatasetInfo {
+  enabled: boolean
+  database_empty: boolean
+  students: number
+  max_gymnasium_classes: number
+  max_lyceum_classes: number
+  gymnasium_class_names: string[]
+  lyceum_class_names: string[]
+}
+
+export interface DatasetRequest {
+  preset: 'demo' | 'school'
+  reset: boolean
+  seed: number
+  gymnasium_classes: number
+  lyceum_classes: number
+  gymnasium_class_min: number
+  gymnasium_class_max: number
+  lyceum_class_size: number
+  solo_share: number
+  rooms_ordinary: number
+  solve: boolean
+  time_limit_seconds: number
+}
+
+export interface DatasetResult {
+  preset: string
+  reset: boolean
+  stats: Record<string, number>
+  removed: Record<string, number>
+  solver_run_id: number | null
+  message: string
+}
+
 export type LinkKind = 'SAME_START' | 'NOT_SIMULTANEOUS' | 'BEFORE'
 
 export interface ActivityLink {
