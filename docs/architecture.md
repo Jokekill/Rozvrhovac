@@ -386,7 +386,24 @@ neexistují a nesmí být doplněny.
 
 ---
 
-## 12. Etapy
+## 12. Testovací datasety
+
+| Dataset | Obsah | Určení |
+| --- | --- | --- |
+| `seed-demo` | 3 třídy, 60 studentů, 12 učitelů, 10 učeben, 15 sólových lekcí | rychlé vyzkoušení, pokrývá všechny základní hard constraints |
+| `seed-school` | 12 tříd, 325 studentů, 38 učitelů, 20 učeben, 241 aktivit, 433 hodin | zátěžový test v reálné velikosti |
+
+`seed-school` staví osmileté gymnázium a lyceum. Počet učitelů se odvozuje
+z reálné výukové zátěže jednotlivých předmětů, ne odhadem, a aktivity se
+přidělují vždy nejméně vytíženému kvalifikovanému učiteli.
+
+Dvě mřížky se záměrně překrývají: akademická výuka běží 08:00–15:20 podle
+period, umělecká 13:00–20:00 mimo mřížku. Odpolední sólová lekce se proto
+opravdu může srazit s hodinou třídy.
+
+Naměřené chování na tomto datasetu je popsané v README.
+
+## 13. Etapy
 
 | Fáze | Obsah | Stav |
 | --- | --- | --- |

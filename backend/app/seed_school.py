@@ -127,7 +127,6 @@ CURRICULUM: dict[str, dict[str, int]] = {
 SUBJECT_FEATURE = {
     "CHE": "chemistry_lab",
     "FYZ": "physics_lab",
-    "BIO": "biology_lab",
     "TV": "gym",
     "INF": "computers",
 }
@@ -186,7 +185,7 @@ class SchoolSpec:
     solo_share: float = 0.27
     second_solo_share: float = 0.22
     ensemble_share: float = 0.30
-    rooms_ordinary: int = 8
+    rooms_ordinary: int = 10
     lessons_per_teacher: int = 20
     tags: dict = field(default_factory=dict)
 
@@ -231,7 +230,7 @@ def seed_school(db: Session, spec: SchoolSpec | None = None) -> dict[str, int]:
     # ---- features, rooms -------------------------------------------------
     feature_names = [
         "classroom", "projector", "computers", "chemistry_lab", "physics_lab",
-        "biology_lab", "gym", "music_room", "piano", "grand_piano", "drums",
+        "gym", "music_room", "piano", "grand_piano", "drums",
         "stage", "soundproof",
     ]
     features = {}
@@ -257,11 +256,9 @@ def seed_school(db: Session, spec: SchoolSpec | None = None) -> dict[str, int]:
     room_specs += [
         ("Laboratoř chemie", "LCH", "B", "1", 30, ["classroom", "chemistry_lab", "projector"]),
         ("Laboratoř fyziky", "LFY", "B", "2", 30, ["classroom", "physics_lab", "projector"]),
-        ("Laboratoř biologie", "LBI", "B", "2", 30, ["classroom", "biology_lab"]),
         ("Počítačová učebna P1", "P1", "A", "2", 17, ["classroom", "computers", "projector"]),
         ("Počítačová učebna P2", "P2", "A", "2", 17, ["classroom", "computers", "projector"]),
-        ("Tělocvična velká", "T1", "C", "0", 80, ["gym"]),
-        ("Tělocvična malá", "T2", "C", "0", 40, ["gym"]),
+        ("Tělocvična", "T1", "C", "0", 80, ["gym"]),
         ("Klavírní studio K1", "K1", "D", "1", 4, ["music_room", "piano", "soundproof"]),
         ("Klavírní studio K2", "K2", "D", "1", 4, ["music_room", "piano", "soundproof"]),
         ("Hudební studio S1", "S1", "D", "1", 12, ["music_room", "soundproof", "drums"]),
